@@ -1,2 +1,2 @@
-import parcs
-from parcs import Config
+from . import parcs
+from .parcs import Config

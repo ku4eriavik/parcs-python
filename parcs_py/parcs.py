@@ -1,16 +1,23 @@
-import Pyro4
-from flask import Flask, render_template, request, send_from_directory, jsonify, Response
-import socket
-import ConfigParser
-from node import Node
-from node_link import create_node_link
-from file_utils import get_job_directory, OUTPUT_FILE_NAME, SOLUTION_FILE_NAME, INPUT_FILE_NAME, store_input, \
-    store_solution, setup_working_directory
-from job import Job
+import configparser
 import logging
-from Queue import Queue
-from network_utils import find_free_port, get_ip
-from parcs_py.scheduler import Scheduler
+
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
+from queue import Queue
+
+from .file_utils import (
+    get_job_directory,
+    INPUT_FILE_NAME,
+    OUTPUT_FILE_NAME,
+    SOLUTION_FILE_NAME,
+    store_input,
+    store_solution,
+    setup_working_directory
+)
+from .job import Job
+from .network_utils import find_free_port, get_ip
+from .node import Node
+from .node_link import create_node_link
+from .scheduler import Scheduler
 
 
 class Config:
@@ -27,7 +34,7 @@ class Config:
 
     @staticmethod
     def load_from_file(config_path):
-        configuration = ConfigParser.ConfigParser()
+        configuration = configparser.ConfigParser()
         configuration.read(config_path)
 
         master = configuration.getboolean(Config.NODE_SECTION, 'master')
@@ -45,8 +52,8 @@ class Config:
 
 def start(conf):
     log.info("Starting...")
-    log.info("Configuring Pyro4...")
-    log.info("Pyro4 configured.")
+    log.info("Configuring Pyro5...")
+    log.info("Pyro5 configured.")
     app.node = Node.create_node(conf)
     if app.node.is_master_node():
         app.scheduler = Scheduler(app.node, app.scheduled_jobs)
@@ -101,8 +108,7 @@ def jobs_page():
 
 @app.route('/add_job', methods=['GET'])
 def add_job_page():
-    return render_template('add_job.html',
-                           title='Add Job')
+    return render_template('add_job.html', title='Add Job')
 
 
 @app.route('/about')
@@ -151,7 +157,7 @@ def delete_worker(worker_id):
     if result:
         log.info("Worker %d removed.", worker_id)
     else:
-        log.warn("Unable to find worker %d.", worker_id)
+        log.warning("Unable to find worker %d.", worker_id)
     return ok() if result else not_found()
 
 

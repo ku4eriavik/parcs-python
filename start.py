@@ -1,6 +1,7 @@
-#!/usr/bin/env python2.7
-from parcs_py import parcs, Config
+#!/usr/bin/env python3
 import argparse
+
+from parcs_py import Config, parcs
 
 parser = argparse.ArgumentParser(description='PARCS Python launcher...')
 parser.add_argument('-ip', help='Node ip')

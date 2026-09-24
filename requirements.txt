@@ -1,4 +1,4 @@
-Pyro4
+Pyro5
 netifaces
 py-cpuinfo
 flask

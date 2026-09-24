@@ -1,17 +1,17 @@
-import imp
-from threading import Thread
-
+import importlib.util
+import json
+import logging
+import requests
 import time
 
-from parcs_py.network_utils import find_free_port
-import Pyro4
-import json
 from abc import abstractmethod
-from node_info import get_node_info_for_current_machine
-from node_link import NodeLink
-from file_utils import get_solution_path, setup_working_directory
-import requests
-import logging
+from Pyro5.api import Daemon
+from threading import Thread
+
+from .file_utils import get_solution_path
+from .node_info import get_node_info_for_current_machine
+from .node_link import NodeLink
+
 
 log = None
 
@@ -73,13 +73,20 @@ class WorkerNode(Node):
         log.warning('Connection with master %s:%d lost.', self.master.ip, self.master.port)
 
     def start_rpc(self, job_id):
+        self.stop_rpc()
         self.rpc_thread = RPCThread(self.conf.ip, job_id, self.conf.job_home)
         uri = self.rpc_thread.register_algorithm_module()
+        if uri is None:
+            self.rpc_thread.stop()
+            self.rpc_thread = None
+            return None
         self.rpc_thread.start()
         log.info("Started RPC for %d job on %s.", job_id, uri)
         return uri
 
     def stop_rpc(self):
+        if self.rpc_thread is None:
+            return
         self.rpc_thread.stop()
         log.info("Stopped RPC for %d job.", self.rpc_thread.job_id)
         self.rpc_thread = None
@@ -88,7 +95,7 @@ class WorkerNode(Node):
 class MasterReconnector(Thread):
     def __init__(self, worker_node):
         super(MasterReconnector, self).__init__()
-        self.setDaemon(True)
+        self.daemon = True
         self.worker_node = worker_node
 
     def run(self):
@@ -100,8 +107,7 @@ class MasterReconnector(Thread):
                     self.worker_node.conf.ip, self.worker_node.conf.port))
                 if response.status_code == 200:
                     break
-            except Exception as e:
-                print(e)
+            except requests.RequestException:
                 pass
         while True:
             if self.worker_node.connected:
@@ -110,7 +116,7 @@ class MasterReconnector(Thread):
                         self.worker_node.master.ip, self.worker_node.master.port))
                     if response.status_code != 200:
                         self.worker_node.connection_with_master_lost()
-                except Exception as e:
+                except requests.RequestException:
                     self.worker_node.connection_with_master_lost()
             else:
                 self.worker_node.register_on_master()
@@ -133,23 +139,20 @@ class MasterNode(Node):
         return True
 
     def register_worker(self, node_link):
-        if len(filter(lambda l: l.ip == node_link.ip and l.port == node_link.port, self.workers)) == 0:
+        if not any(link.ip == node_link.ip and link.port == node_link.port for link in self.workers):
             self.workers.append(node_link)
             ret = True
         else:
             log.warning('Unable to register node %s:%d because it is already registered.', node_link.ip, node_link.port)
             ret = False
-        print(node_link)
-        print(self.workers)
         return ret
 
     def find_worker(self, worker_id):
-        workers_list = filter(lambda w: w.id == worker_id, self.workers)
-        return None if len(workers_list) == 0 else workers_list[0]
+        return next((worker for worker in self.workers if worker.id == worker_id), None)
 
     def delete_worker(self, worker_id):
         prev_len = len(self.workers)
-        self.workers = filter(lambda w: w.id != worker_id, self.workers)
+        self.workers = [worker for worker in self.workers if worker.id != worker_id]
         return prev_len != len(self.workers)
 
     def abort_job(self, job_id):
@@ -165,14 +168,13 @@ class MasterNode(Node):
         log.info("Job was added.")
 
     def find_job(self, job_id):
-        filtered = filter(lambda j: j.id == job_id, self.jobs)
-        return None if len(filtered) == 0 else filtered[0]
+        return next((job for job in self.jobs if job.id == job_id), None)
 
 
 class Heartbeat(Thread):
     def __init__(self, master_node):
         super(Heartbeat, self).__init__()
-        self.setDaemon(True)
+        self.daemon = True
         self.master_node = master_node
         self.log = logging.getLogger('Heartbeat')
 
@@ -186,12 +188,12 @@ class Heartbeat(Thread):
                     response = requests.get('http://%s:%s/api/internal/heartbeat' % (worker.ip, worker.port))
                     if response.status_code != 200:
                         dead_workers.append(worker.id)
-                except Exception as e:
+                except requests.RequestException:
                     dead_workers.append(worker.id)
             if len(dead_workers) == 0:
                 self.log.debug('All workers alive.')
             else:
-                self.log.warn('%d workers are dead.', len(dead_workers))
+                self.log.warning('%d workers are dead.', len(dead_workers))
             for dead_worker in dead_workers:
                 self.master_node.delete_worker(dead_worker)
 
@@ -201,34 +203,42 @@ class RPCThread(Thread):
 
     def __init__(self, ip, job_id, job_home):
         super(RPCThread, self).__init__()
-        self.setDaemon(True)
+        self.daemon = True
         self.job_id = job_id
         self.job_home = job_home
         try:
-            self.daemon = Pyro4.Daemon(host=ip)
-            RPCThread.log.info('Pyro4 daemon created successfully.')
-        except Exception as e:
-            RPCThread.log.error('Unable to create pyro4 daemon.')
+            self.pyro_daemon = Daemon(host=ip)
+            RPCThread.log.info('Pyro5 daemon created successfully.')
+        except Exception:
+            self.pyro_daemon = None
+            RPCThread.log.exception('Unable to create Pyro5 daemon.')
 
     def register_algorithm_module(self):
-        if not self.daemon:
+        if not self.pyro_daemon:
             return None
         try:
-            algorithm_module = imp.load_source('solver_module_%d' % self.job_id,
-                                               get_solution_path(self.job_home, self.job_id))
+            module_name = 'solver_module_%d' % self.job_id
+            module_spec = importlib.util.spec_from_file_location(
+                module_name, get_solution_path(self.job_home, self.job_id)
+            )
+            if module_spec is None or module_spec.loader is None:
+                raise ImportError('Unable to load solver module specification.')
+            algorithm_module = importlib.util.module_from_spec(module_spec)
+            module_spec.loader.exec_module(algorithm_module)
             solver = algorithm_module.Solver()
-            uri = self.daemon.register(solver)
+            uri = self.pyro_daemon.register(solver)
             RPCThread.log.info("Algorithm module registered on %s.", uri)
             return uri
-        except Exception as e:
-            RPCThread.log.error("Unable to create algorithm module or register it: %s.", str(e))
+        except Exception:
+            RPCThread.log.exception('Unable to create algorithm module or register it.')
             return None
 
     def run(self):
         try:
-            self.daemon.requestLoop()
-        except Exception as e:
-            log.warning('Error of %s.', str(e))
+            self.pyro_daemon.requestLoop()
+        except Exception:
+            log.exception('Pyro5 RPC request loop failed.')
 
     def stop(self):
-        self.daemon.shutdown()
+        if self.pyro_daemon:
+            self.pyro_daemon.shutdown()

@@ -1,4 +1,5 @@
-from Pyro4 import expose
+from Pyro5.api import expose
+
 
 class Solver:
     def __init__(self, workers=None, input_file_name=None, output_file_name=None):
@@ -11,14 +12,14 @@ class Solver:
         print("Job Started")
         print("Workers %d" % len(self.workers))
         n = self.read_input()
-        step = n / len(self.workers)
+        step = n // len(self.workers)
 
         # map
         mapped = []
-        for i in xrange(0, len(self.workers)):
+        for i in range(len(self.workers)):
             mapped.append(self.workers[i].mymap(i * step, i * step + step))
 
-        print 'Map finished: ', mapped
+        print('Map finished:', mapped)
 
         # reduce
         reduced = self.myreduce(mapped)
@@ -32,9 +33,9 @@ class Solver:
     @staticmethod
     @expose
     def mymap(a, b):
-        print (a, b)
+        print(a, b)
         res = 0
-        for i in xrange(a, b):
+        for i in range(a, b):
             res += i
         return res
 
@@ -42,8 +43,8 @@ class Solver:
     @expose
     def myreduce(mapped):
         output = 0
-        for x in mapped:
-            output += x.value
+        for value in mapped:
+            output += value
         return output
 
     def read_input(self):

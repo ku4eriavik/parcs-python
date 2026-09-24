@@ -59,10 +59,9 @@ def get_job_directory(job_home, job_id):
 def clear_directory(directory):
     try:
         shutil.rmtree(directory)
-        # print '>> Remove dir stub'
         log.info('Directory %s was cleared.', directory)
-    except Exception as e:
-        log.warn('Error while clearing %s directory.', directory)
+    except Exception:
+        log.warning('Error while clearing %s directory.', directory)
 
 
 def setup_working_directory():
