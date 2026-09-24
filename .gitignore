@@ -1,7 +1,8 @@
 .idea/
-py2-env/
-*.pyc
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
 commands.txt
-.vagrant
-test
 *.backup
