@@ -1,5 +1,4 @@
 Pyro5
-netifaces
 py-cpuinfo
 flask
 requests

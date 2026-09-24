@@ -74,7 +74,13 @@ class WorkerNode(Node):
 
     def start_rpc(self, job_id):
         self.stop_rpc()
-        self.rpc_thread = RPCThread(self.conf.ip, job_id, self.conf.job_home)
+        self.rpc_thread = RPCThread(
+            self.conf.bind_host,
+            self.conf.ip,
+            self.conf.rpc_port,
+            job_id,
+            self.conf.job_home,
+        )
         uri = self.rpc_thread.register_algorithm_module()
         if uri is None:
             self.rpc_thread.stop()
@@ -100,20 +106,10 @@ class MasterReconnector(Thread):
 
     def run(self):
         while True:
-            try:
-                time.sleep(1)
-                log.info('Trying to connect')
-                response = requests.get('http://%s:%s/api/internal/heartbeat' % (
-                    self.worker_node.conf.ip, self.worker_node.conf.port))
-                if response.status_code == 200:
-                    break
-            except requests.RequestException:
-                pass
-        while True:
             if self.worker_node.connected:
                 try:
                     response = requests.get('http://%s:%s/api/internal/heartbeat' % (
-                        self.worker_node.master.ip, self.worker_node.master.port))
+                        self.worker_node.master.ip, self.worker_node.master.port), timeout=5)
                     if response.status_code != 200:
                         self.worker_node.connection_with_master_lost()
                 except requests.RequestException:
@@ -201,13 +197,18 @@ class Heartbeat(Thread):
 class RPCThread(Thread):
     log = logging.getLogger('RPC Thread')
 
-    def __init__(self, ip, job_id, job_home):
+    def __init__(self, bind_host, advertise_host, port, job_id, job_home):
         super(RPCThread, self).__init__()
         self.daemon = True
         self.job_id = job_id
         self.job_home = job_home
         try:
-            self.pyro_daemon = Daemon(host=ip)
+            self.pyro_daemon = Daemon(
+                host=bind_host,
+                port=port,
+                nathost=advertise_host,
+                natport=port,
+            )
             RPCThread.log.info('Pyro5 daemon created successfully.')
         except Exception:
             self.pyro_daemon = None
