@@ -1,7 +1,8 @@
 # Author: Korobka A.
-
-from Pyro4 import expose
 import numpy as np
+
+from Pyro5.api import expose
+
 
 class Solver:
     def __init__(self, workers=None, input_file_name=None, output_file_name=None):
@@ -15,7 +16,7 @@ class Solver:
         # map
         mapped = []
         c = centroids.tolist()
-        for i in xrange(0, len(self.workers)):
+        for i in range(len(self.workers)):
             l = chunks[i].tolist()
             mapped.append(self.workers[i].get_closest_centroids(l, c))
 
@@ -59,16 +60,16 @@ class Solver:
         X = np.asarray(X)
         centroids = np.asarray(centroids)
         res = [np.argmin([np.sum(np.power(x - c, 2)) for c in centroids]) for x in X]
-        return [np.asscalar(x) for x in res]
+        return [int(x) for x in res]
 
     @staticmethod
     def myreduce(mapped):
         output = []
-        for x in mapped:
-            output += x.value
+        for value in mapped:
+            output += value
         print(output)
         return output
-        
+
     def _move_centroids(self, closest_centroids):
         res = np.zeros((self.num_clusters, self.X.shape[-1]))
         for i in range(self.num_clusters):

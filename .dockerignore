@@ -1,0 +1,13 @@
+.git/
+.github/
+.idea/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+commands.txt
+*.backup
+README.md
+Dockerfile
+.dockerignore

@@ -1,35 +1,34 @@
-# PARCS Python
+# PARCS [Python]
 
-You can browse the PDF version at https://git.sr.ht/%7Ehummer12007/parcs-python/tree/master/parcs-python.pdf
+## Recommended testing workflow
 
-Docker image available at https://hub.docker.com/r/hummer12007/parcs-node/
+When developing a parallel PARCS solution, test it progressively before using
+paid cloud resources:
 
-## Google Cloud deployment tutorial
+1. **Implement the parallel algorithm.**
+   Create a solution that distributes work between workers and combines the
+   received results.
 
-### Preparation
+2. **Test on one machine first.**
+   Run the master and several workers as Docker containers on the same machine.
+   This is the fastest and cheapest way to find implementation, scheduling, and
+   basic networking issues.
 
-1. Install Google Cloud SDK
-2. Login to gcloud: `gcloud auth login`
-3. Create a project: `gcloud projects create project-name`. You need to invent your own cute project name here.
-4. Select the project: `gcloud config set project parcs-name`.
-5. You need to enable Cloud and Billing API using Google Cloud Console here (you will be prompted to do so later otherwise).
-5. Set region and zone: `gcloud config set compute/zone europe-north1-a`, `gcloud config set compute/region europe-north1`.
-6. Configure firewall: `gcloud compute   firewall-rules create allow-all --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=all --source-ranges=0.0.0.0/0`
+   See [Same-machine test guide](guide_run_on_same_machine.md).
 
-### Instance creation
+3. **Optionally test in a local network.**
+   Run the master and workers on separate machines in the same LAN. This
+   validates node registration and HTTP/Pyro5 communication through real network
+   addresses before deploying to a cloud provider.
 
-1. Create the master instance: `gcloud compute instances create-with-container master --container-image=registry.hub.docker.com/hummer12007/parcs-node --container-env PARCS_ARGS="master"`
+   See [Local-network test guide](guide_run_in_local_network.md).
 
-Example output:
+4. **Test in Google Cloud.**
+   Create master and worker Compute Engine instances only after local testing is
+   successful. Google Cloud resources may incur charges, so delete the test VMs,
+   disks, and temporary firewall rules after completing the test.
 
-```
-NAME    ZONE             MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
-master  europe-north1-a  n1-standard-1               10.166.0.2   35.228.130.74  RUNNING
-```
+   See [Google Cloud test guide](guide_run_on_google_cloud.md).
 
-You need to record the external IP, it will be referred to as `$MASTER_IP` later.
-
-2. Create the workers (you can create as many as you wish): `gcloud compute instances create-with-container worker1 worker2 worker3 --container-image=registry.hub.docker.com/hummer12007/parcs-node --container-env PARCS_ARGS="worker 10.166.0.2"`
-
-3. The PARCS web interface will be available at http://$MASTER_IP:8080
-
+Following this order reduces debugging time and helps avoid unnecessary cloud
+costs.

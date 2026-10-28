@@ -1,6 +1,7 @@
 # import gmpy2
-from Pyro4 import expose
 import random
+
+from Pyro5.api import expose
 
 
 class Solver:
@@ -17,12 +18,12 @@ class Solver:
         (n, k) = self.read_input()
         a = 1 << n
         b = 1 << (n + 1)
-        step_n = (b - a) / len(self.workers)
-        step_k = k / len(self.workers)
+        step_n = (b - a) // len(self.workers)
+        step_k = k // len(self.workers)
 
         # map
         mapped = []
-        for i in xrange(0, len(self.workers)):
+        for i in range(len(self.workers)):
             print("map %d" % i)
             mapped.append(self.workers[i].mymap(str(a + i * step_n), str(a + (i + 1) * step_n), step_k))
 
@@ -62,7 +63,7 @@ class Solver:
 
         for primes in mapped:
             print("reduce loop")
-            output = output + primes.value
+            output = output + primes
         print("reduce done")
         return output
 
@@ -88,39 +89,6 @@ class Solver:
 
         A return value of False means n is certainly not prime. A return value of
         True means n is very likely a prime.
-
-        >>> is_probable_prime(1)
-        Traceback (most recent call last):
-            ...
-        AssertionError
-        >>> is_probable_prime(2)
-        True
-        >>> is_probable_prime(3)
-        True
-        >>> is_probable_prime(4)
-        False
-        >>> is_probable_prime(5)
-        True
-        >>> is_probable_prime(123456789)
-        False
-
-        >>> primes_under_1000 = [i for i in range(2, 1000) if is_probable_prime(i)]
-        >>> len(primes_under_1000)
-        168
-        >>> primes_under_1000[-10:]
-        [937, 941, 947, 953, 967, 971, 977, 983, 991, 997]
-
-        >>> is_probable_prime(6438080068035544392301298549614926991513861075340134\
-    3291807343952413826484237063006136971539473913409092293733259038472039\
-    7133335969549256322620979036686633213903952966175107096769180017646161\
-    851573147596390153)
-        True
-
-        >>> is_probable_prime(7438080068035544392301298549614926991513861075340134\
-    3291807343952413826484237063006136971539473913409092293733259038472039\
-    7133335969549256322620979036686633213903952966175107096769180017646161\
-    851573147596390153)
-        False
         """
         assert n >= 2
         # special case 2

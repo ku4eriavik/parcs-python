@@ -1,4 +1,4 @@
-from cpuinfo import cpuinfo
+from cpuinfo import get_cpu_info
 
 
 class NodeInfo:
@@ -12,7 +12,7 @@ class NodeInfo:
 
 def get_node_info_for_current_machine():
     # TODO
-    return NodeInfo(cpuinfo.get_cpu_info()['brand'], '4 GB')
+    return NodeInfo(get_cpu_info().get('brand_raw', 'Unknown CPU'), '4 GB')
 
 
 def create_node_info(json):

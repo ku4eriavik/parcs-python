@@ -1,5 +1,4 @@
-Pyro4
-netifaces
+Pyro5
 py-cpuinfo
 flask
 requests

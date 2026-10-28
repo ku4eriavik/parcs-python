@@ -1,5 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-[ -n "$PARCS_ARGS" ] && ./generate_config.sh $PARCS_ARGS > parcs.config
-
-./start.py -config parcs.config
+exec python3 ./start.py "$@"
