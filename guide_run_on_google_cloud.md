@@ -142,7 +142,7 @@ gcloud compute firewall-rules create parcs-allow-master-ui \
 Set repo variables:
 ```
 export REPO_URL="https://github.com/ku4eriavik/parcs-python.git"
-export BRANCH="dev/refactor_legacy"
+export BRANCH="master"
 ```
 
 Create master instance:

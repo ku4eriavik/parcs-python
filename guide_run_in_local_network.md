@@ -8,7 +8,6 @@ This guide assumes that this repo is cloned to all the mentioned machines and th
 ```
 docker build -t parcs-node .
 ```
-Currrently, the `dev/refactor_legacy` repo branch is used.
 
 
 ## ALIASES
